@@ -27,7 +27,7 @@ namespace Strings_Analyze
         }
 
         /**
-         * Load signature files recursively
+         * Load pattern files recursively
          */
         public void Load(string path)
         {
@@ -41,7 +41,7 @@ namespace Strings_Analyze
             {
                 FileInfo info = new FileInfo(path);
 #if DEBUG
-                //Trace.WriteLine($"[*] Reading signatures from file \"{info.Name}\"");
+                //Trace.WriteLine($"[*] Reading patterns from file \"{info.Name}\"");
 #endif
 
                 using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -61,7 +61,7 @@ namespace Strings_Analyze
                                 {
                                     if (line.Length > 255)
                                         line = line.Substring(0, 255);
-                                    throw new Exception($"Invalid signature: {line}");
+                                    throw new Exception($"Invalid pattern: {line}");
                                 }
 
                                 var pattern = new Pattern
@@ -95,7 +95,7 @@ namespace Strings_Analyze
                                 patterns.Add(pattern);
 
 #if DEBUG
-                            //Trace.WriteLine($"[*]   Loaded signature {signature.GetHashCode()}");
+                            //Trace.WriteLine($"[*]   Loaded pattern {pattern.GetHashCode()}");
 #endif
                             }
                             catch (Exception err)
@@ -109,7 +109,7 @@ namespace Strings_Analyze
             }
 
 #if DEBUG
-            //Trace.WriteLine($"[*] All signatures loaded");
+            //Trace.WriteLine($"[*] All patterns loaded");
 #endif
         }
 
@@ -122,7 +122,7 @@ namespace Strings_Analyze
                 try
                 {
 #if DEBUG
-                //Trace.WriteLine($"[*] Testing \"{str}\" against signature {signature.GetHashCode()}");
+                //Trace.WriteLine($"[*] Testing \"{str}\" against pattern {signature.GetHashCode()}");
 #endif
 
                     if (pattern.OptFullString)
