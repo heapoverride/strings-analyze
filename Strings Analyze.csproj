@@ -38,6 +38,9 @@
   <PropertyGroup>
     <ApplicationIcon>strings_analyze_2.ico</ApplicationIcon>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>Strings_Analyze.App</StartupObject>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -101,12 +104,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="strings_analyze.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\strings_analyze.ico" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\strings_analyze_2.ico" />
