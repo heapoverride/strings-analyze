@@ -13,6 +13,7 @@ namespace Strings_Analyze
     public class Scanner
     {
         private List<Pattern> patterns = new List<Pattern>();
+        private List<Regex> ignoreList = new List<Regex>();
 
         /* Event handlers */
         public EventHandler<ProgrssChangedEventArgsProgressEventArgs> OnProgressChanged;
@@ -23,7 +24,52 @@ namespace Strings_Analyze
         /* Constructor */
         public Scanner()
         {
-            Regex.CacheSize = 128;
+            Regex.CacheSize = 256;
+
+            // check if "DomainIgnoreList.pat" exists
+            string ignoreListPath = "DomainIgnoreList.pat";
+            if (File.Exists(ignoreListPath))
+            {
+                // load regular expressions from ignore list
+                ignoreList.AddRange(Utils.ReadRegexesFromFile(ignoreListPath));
+            }
+        }
+
+        /**
+         * Check if this `url` or `domain` can be ignored
+         */
+        private bool CanIgnore(Result result, MatchGroup group)
+        {
+            if (ignoreList.Count == 0) return false;
+
+            try
+            {
+                if (group == MatchGroup.url)
+                {
+                    Uri uri = new Uri(result.Value);
+                    string domain = uri.DnsSafeHost;
+
+                    foreach (Regex re in ignoreList)
+                    {
+                        if (re.IsMatch(domain))
+                            return true;
+                    }
+                }
+                else if (group == MatchGroup.domain)
+                {
+                    foreach (Regex re in ignoreList)
+                    {
+                        if (re.IsMatch(result.Value))
+                            return true;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+
+            }
+
+            return false;
         }
 
         /**
@@ -40,9 +86,6 @@ namespace Strings_Analyze
             } else if (File.Exists(path) && path.EndsWith(".pat"))
             {
                 FileInfo info = new FileInfo(path);
-#if DEBUG
-                //Trace.WriteLine($"[*] Reading patterns from file \"{info.Name}\"");
-#endif
 
                 using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
@@ -66,10 +109,19 @@ namespace Strings_Analyze
 
                                 var pattern = new Pattern
                                 {
-                                    Group = array[1],
-                                    Description = array[2],
-                                    Type = MatchType.Informative
+                                    Type = MatchType.Informative,
+                                    Group = MatchGroup.unknown,
+                                    Description = array[2]
                                 };
+
+                                MatchGroup group;
+                                if (Enum.TryParse(array[1], out group))
+                                {
+                                    pattern.Group = group;
+                                } else
+                                {
+                                    pattern.CustomGroup = array[1];
+                                }
 
                                 Regex regex = new Regex(array[3], RegexOptions.Compiled);
 
@@ -93,10 +145,6 @@ namespace Strings_Analyze
                                 if (array[0] == "4") pattern.Type = MatchType.Critical;
 
                                 patterns.Add(pattern);
-
-#if DEBUG
-                            //Trace.WriteLine($"[*]   Loaded pattern {pattern.GetHashCode()}");
-#endif
                             }
                             catch (Exception err)
                             {
@@ -107,10 +155,6 @@ namespace Strings_Analyze
                     }
                 }
             }
-
-#if DEBUG
-            //Trace.WriteLine($"[*] All patterns loaded");
-#endif
         }
 
         public List<Result> Scan(string str)
@@ -121,21 +165,20 @@ namespace Strings_Analyze
             {
                 try
                 {
-#if DEBUG
-                //Trace.WriteLine($"[*] Testing \"{str}\" against pattern {signature.GetHashCode()}");
-#endif
-
                     if (pattern.OptFullString)
                     {
                         if (pattern.Regex.IsMatch(str))
                         {
-                            results.Add(new Result
+                            var result = new Result
                             {
-                                Group = pattern.Group,
+                                Group = (pattern.Group == MatchGroup.unknown ? pattern.CustomGroup : Enum.GetName(typeof(MatchGroup), pattern.Group).ToLower()),
                                 Description = pattern.Description,
                                 Value = str,
                                 Type = pattern.Type
-                            });
+                            };
+
+                            if (!CanIgnore(result, pattern.Group))
+                                results.Add(result);
                         }
 
                         continue;
@@ -143,34 +186,26 @@ namespace Strings_Analyze
 
                     var matches = pattern.Regex.Matches(str);
 
-#if DEBUG
-                //if (matches.Count == 0)
-                //{
-                //    Trace.WriteLine($"[*]   No matches");
-                //} else
-                //{
-                //    Trace.WriteLine($"[*]   Found {matches.Count} matches");
-                //}
-#endif
-
                     foreach (Match match in matches)
                     {
                         var result = new Result
                         {
-                            Group = pattern.Group,
+                            Group = (pattern.Group == MatchGroup.unknown ? pattern.CustomGroup : Enum.GetName(typeof(MatchGroup), pattern.Group).ToLower()),
                             Description = pattern.Description,
                             Value = match.Groups[0].Value,
                             Type = pattern.Type
                         };
 
-                        results.Add(result);
+                        if (!CanIgnore(result, pattern.Group))
+                            results.Add(result);
                     }
                 }
                 catch (Exception err)
                 {
                     System.Windows.MessageBox.Show(
-                        "Group: " + pattern.Group + "\n" + 
-                        "Description: " + pattern.Description + "\n\n" + err.ToString(), 
+                        "Group:        " + pattern.Group.ToString() + "\n" +
+                        "CustomGroup:  " + (pattern.CustomGroup != null ? pattern.CustomGroup : "-") + "\n" +
+                        "Description:  " + pattern.Description + "\n\n" + err.ToString(), 
                         "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
                     Environment.Exit(1);
                 }
@@ -189,10 +224,6 @@ namespace Strings_Analyze
 
             try
             {
-#if DEBUG
-            //Trace.WriteLine($"[*] Started scanning file \"{path}\"");
-#endif
-
                 using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
                     using (StreamReader reader = new StreamReader(stream))
@@ -224,10 +255,6 @@ namespace Strings_Analyze
                                 results.AddRange(_results);
                             }
 
-#if DEBUG
-                        //Trace.WriteLine($"[*]   Line number = {linenum}");
-#endif
-
                             linenum++;
 
                             stringScanned += 1;
@@ -237,7 +264,6 @@ namespace Strings_Analyze
                             });
                         }
 
-                        // completed
                         OnProgressChanged?.Invoke(this, new ProgrssChangedEventArgsProgressEventArgs { Value = 100 });
                     }
                 }
@@ -250,9 +276,6 @@ namespace Strings_Analyze
                 //System.Windows.MessageBox.Show("Analysis finished!");
             }
 
-            // do something here
-            // ...
-
             return results;
         }
 
@@ -260,7 +283,11 @@ namespace Strings_Analyze
         {
             public Regex Regex { get; set; }
             public MatchType Type { get; set; }
-            public string Group { get; set; }
+
+            public MatchGroup Group { get; set; }
+            public string CustomGroup { get; set; }
+
+
             public string Description { get; set; }
 
             public bool OptFullString = false;
@@ -279,11 +306,50 @@ namespace Strings_Analyze
         {
             Informative,   // 0 (black)
             Interesting,   // 1 (black, bold)
-
             Miscellaneous, // 2 (blue, bold)
-
             Warning,       // 3 (orange, bold)
             Critical       // 4 (red, bold)
+        }
+
+        // hardcoded match groups
+        public enum MatchGroup
+        {
+            unknown,
+
+            malware,
+            suspicious,
+
+            antidebug,
+            antimalware,
+            antivm,
+
+            compression,
+            credentials,
+            cryptography,
+            diagnostic,
+            filesystem,
+            registry,
+            execution,
+            http,
+            keys,
+            library,
+            management,
+            memory,
+            network,
+            dyndns,
+            obfuscation,
+            process,
+            ransomware,
+            security,
+            tor,
+            useragent,
+            utility,
+
+            domain,
+            ip,
+            url,
+
+            other,
         }
     }
 }

@@ -5,11 +5,35 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 
 namespace Strings_Analyze
 {
     class Utils
     {
+        public static Regex[] ReadRegexesFromFile(string path)
+        {
+            List<Regex> regexes = new List<Regex>();
+
+            using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    while (!reader.EndOfStream)
+                    {
+                        string line = reader.ReadLine().Trim();
+
+                        if (line.Length > 0 && !line.StartsWith("#"))
+                        {
+                            regexes.Add(new Regex(line, RegexOptions.IgnoreCase | RegexOptions.Compiled));
+                        }
+                    }
+                }
+            }
+
+            return regexes.ToArray();
+        }
+
         public static long GetStringCount(string path)
         {
             long strings = 0;
