@@ -7,24 +7,27 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Threading;
 
 namespace Strings_Analyze
 {
     public class Scanner
     {
+        private string[] strings;
         private List<Pattern> patterns = new List<Pattern>();
         private List<Regex> ignoreList = new List<Regex>();
+        private int progress = 0;
 
         /* Event handlers */
-        public EventHandler<ProgrssChangedEventArgsProgressEventArgs> OnProgressChanged;
-        public class ProgrssChangedEventArgsProgressEventArgs : EventArgs {
+        public EventHandler<ProgressChangedEventArgsProgressEventArgs> OnProgressChanged;
+        public class ProgressChangedEventArgsProgressEventArgs : EventArgs {
             public double Value { get; set; }
         }
 
         /* Constructor */
         public Scanner()
         {
-            Regex.CacheSize = 256;
+            Regex.CacheSize = 128;
 
             // check if "DomainIgnoreList.pat" exists
             string ignoreListPath = "DomainIgnoreList.pat";
@@ -156,24 +159,30 @@ namespace Strings_Analyze
                 }
             }
         }
-
-        public List<Result> Scan(string str)
+        
+        /**
+         * Scanning thread
+         */
+        private void Scan(object _args)
         {
+            ScanThreadArgs args = (ScanThreadArgs)_args;
             var results = new List<Result>();
 
-            foreach (var pattern in patterns)
+            for (int i = 0; i < args.value; i++)
             {
-                try
+                string _string = strings[args.offset + i];
+
+                foreach (var pattern in patterns)
                 {
                     if (pattern.OptFullString)
                     {
-                        if (pattern.Regex.IsMatch(str))
+                        if (pattern.Regex.IsMatch(_string))
                         {
                             var result = new Result
                             {
                                 Group = (pattern.Group == MatchGroup.unknown ? pattern.CustomGroup : Enum.GetName(typeof(MatchGroup), pattern.Group).ToLower()),
                                 Description = pattern.Description,
-                                Value = str,
+                                Value = _string,
                                 Type = pattern.Type
                             };
 
@@ -184,7 +193,7 @@ namespace Strings_Analyze
                         continue;
                     }
 
-                    var matches = pattern.Regex.Matches(str);
+                    var matches = pattern.Regex.Matches(_string);
 
                     foreach (Match match in matches)
                     {
@@ -200,82 +209,84 @@ namespace Strings_Analyze
                             results.Add(result);
                     }
                 }
-                catch (Exception err)
-                {
-                    System.Windows.MessageBox.Show(
-                        "Group:        " + pattern.Group.ToString() + "\n" +
-                        "CustomGroup:  " + (pattern.CustomGroup != null ? pattern.CustomGroup : "-") + "\n" +
-                        "Description:  " + pattern.Description + "\n\n" + err.ToString(), 
-                        "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-                    Environment.Exit(1);
-                }
+
+                progress++;
             }
 
-            return results;
+            lock (args.results)
+            {
+                args.results.AddRange(results);
+            }
         }
 
+        private struct ScanThreadArgs
+        {
+            public int offset;
+            public int value;
+            public List<Result> results;
+        }
+
+        /**
+         * Scan strings file using multi-threading
+         */
         public List<Result> ScanFile(string path)
         {
             var results = new List<Result>();
-            uint linenum = 1;
+            strings = File.ReadAllLines(path);
 
-            long stringsCount = Utils.GetStringCount(path);
-            long stringScanned = 0;
+            const int thread_count = 4;
+            var threads = new Thread[thread_count];
+            int value = (int)Math.Ceiling((double)strings.Length / (double)thread_count);
 
-            try
+            int offset = 0;
+
+            // create and start scanning threads
+            for (int i = 0; i < thread_count; i++)
             {
-                using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                int real_value = value;
+
+                if (strings.Length < offset + value)
                 {
-                    using (StreamReader reader = new StreamReader(stream))
+                    real_value = (offset + value) - strings.Length;
+                }
+
+                threads[i] = new Thread(new ParameterizedThreadStart(Scan));
+                threads[i].Start(new ScanThreadArgs { 
+                    offset = offset,
+                    value = real_value,
+                    results = results
+                });
+
+                offset += value;
+            }
+
+            // wait for all threads to complete execution
+            bool flag = false;
+
+            while (!flag)
+            {
+                flag = true;
+
+                for (int i = 0; i < thread_count; i++)
+                {
+                    if (threads[i].IsAlive)
                     {
-                        while (!reader.EndOfStream)
-                        {
-                            string line = reader.ReadLine().Trim();
-                            if (line.Length == 0) continue;
-
-                            string[] strings = line.Split(new char[] { '\0' });
-
-                            foreach (string str in strings)
-                            {
-                                if (str.Length < 4) continue;
-
-                                List<Result> _results = null;
-                                if (str.Length > 1048)
-                                {
-                                    _results = Scan(str.Remove(1048));
-                                }
-                                else
-                                {
-                                    _results = Scan(str);
-                                }
-
-                                foreach (var _result in _results)
-                                    _result.LineNumber = linenum;
-
-                                results.AddRange(_results);
-                            }
-
-                            linenum++;
-
-                            stringScanned += 1;
-                            OnProgressChanged?.Invoke(this, new ProgrssChangedEventArgsProgressEventArgs
-                            {
-                                Value = ((double)stringScanned / (double)stringsCount) * (double)100
-                            });
-                        }
-
-                        OnProgressChanged?.Invoke(this, new ProgrssChangedEventArgsProgressEventArgs { Value = 100 });
+                        flag = false;
+                        break;
                     }
                 }
-            }
-            catch (Exception err)
-            {
-                System.Windows.MessageBox.Show(err.ToString(), "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-            } finally
-            {
-                //System.Windows.MessageBox.Show("Analysis finished!");
+
+                OnProgressChanged?.Invoke(this, new ProgressChangedEventArgsProgressEventArgs
+                {
+                    Value = ((double)progress / (double)strings.Length) * (double)100
+                });
+
+                Thread.Sleep(1000);
+                if (flag) break;
             }
 
+            // return results
+            OnProgressChanged?.Invoke(this, new ProgressChangedEventArgsProgressEventArgs { Value = 100 });
             return results;
         }
 

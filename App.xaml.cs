@@ -25,17 +25,6 @@ namespace Strings_Analyze
             window = new MainWindow();
             window.Show();
 
-            //string text = System.IO.File.ReadAllText("parse.txt");
-            //System.Windows.MessageBox.Show(String.Join("\n", Utils.Parse(text)));
-            //Environment.Exit(0);
-
-            // Future format idea!
-            /*
-                    + "malware" 3 "Predator stealer (Predator the Thief)"
-                        - "\\\\AppData\\\\Roaming\\\\.+\\\\General\\\\IeEdgePasswords.txt" i
-                        - "Predator The Thief"
-             */
-
 #if DEBUG
             Trace.WriteLine("Strings Analyze launched");
 #endif
@@ -88,7 +77,7 @@ namespace Strings_Analyze
                     var scanner = new Scanner();
                     scanner.Load("Patterns");
 
-                    scanner.OnProgressChanged += (object sender, Scanner.ProgrssChangedEventArgsProgressEventArgs e) =>
+                    scanner.OnProgressChanged += (object sender, Scanner.ProgressChangedEventArgsProgressEventArgs e) =>
                     {
                         Dispatcher.BeginInvoke((Action)delegate {
                             window.progress.Value = e.Value;

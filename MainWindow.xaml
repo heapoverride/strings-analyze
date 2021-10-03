@@ -30,6 +30,9 @@
                 </Style>
             </ProgressBar.Style>
         </ProgressBar>
+        
+        <!-- Groups -->
+        
 
         <!-- Strings -->
         <DataGrid Grid.Row="1" x:Name="results" 

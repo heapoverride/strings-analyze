@@ -34,24 +34,24 @@ namespace Strings_Analyze
             return regexes.ToArray();
         }
 
-        public static long GetStringCount(string path)
-        {
-            long strings = 0;
+        //public static long GetStringCount(string path)
+        //{
+        //    long strings = 0;
 
-            using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-            {
-                using (StreamReader reader = new StreamReader(stream))
-                {
-                    while (!reader.EndOfStream)
-                    {
-                        string line = reader.ReadLine();
-                        if (line.Length > 0) strings++;
-                    }
-                }
-            }
+        //    using (FileStream stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        //    {
+        //        using (StreamReader reader = new StreamReader(stream))
+        //        {
+        //            while (!reader.EndOfStream)
+        //            {
+        //                string line = reader.ReadLine();
+        //                if (line.Length > 0) strings++;
+        //            }
+        //        }
+        //    }
 
-            return strings;
-        }
+        //    return strings;
+        //}
 
         public static string[] Parse(string text, char quote = '"')
         {
