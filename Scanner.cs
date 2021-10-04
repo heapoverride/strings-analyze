@@ -172,7 +172,8 @@ namespace Strings_Analyze
             {
                 try
                 {
-                    string _string = strings[args.offset + i];
+                    int index = args.offset + i;
+                    string _string = strings[index];
 
                     if (_string.Length > 1200)
                     {
@@ -190,7 +191,8 @@ namespace Strings_Analyze
                                     Group = (pattern.Group == MatchGroup.unknown ? pattern.CustomGroup : Enum.GetName(typeof(MatchGroup), pattern.Group).ToLower()),
                                     Description = pattern.Description,
                                     Value = _string,
-                                    Type = pattern.Type
+                                    Type = pattern.Type,
+                                    LineNumber = 1 + (uint)index
                                 };
 
                                 if (!CanIgnore(result, pattern.Group))
@@ -209,7 +211,8 @@ namespace Strings_Analyze
                                 Group = (pattern.Group == MatchGroup.unknown ? pattern.CustomGroup : Enum.GetName(typeof(MatchGroup), pattern.Group).ToLower()),
                                 Description = pattern.Description,
                                 Value = match.Groups[0].Value,
-                                Type = pattern.Type
+                                Type = pattern.Type,
+                                LineNumber = 1 + (uint)index
                             };
 
                             if (!CanIgnore(result, pattern.Group))
