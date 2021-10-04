@@ -170,44 +170,57 @@ namespace Strings_Analyze
 
             for (int i = 0; i < args.value; i++)
             {
-                string _string = strings[args.offset + i];
-
-                foreach (var pattern in patterns)
+                try
                 {
-                    if (pattern.OptFullString)
+                    string _string = strings[args.offset + i];
+
+                    if (_string.Length > 1200)
                     {
-                        if (pattern.Regex.IsMatch(_string))
+                        _string = _string.Substring(0, 1200);
+                    }
+
+                    foreach (var pattern in patterns)
+                    {
+                        if (pattern.OptFullString)
+                        {
+                            if (pattern.Regex.IsMatch(_string))
+                            {
+                                var result = new Result
+                                {
+                                    Group = (pattern.Group == MatchGroup.unknown ? pattern.CustomGroup : Enum.GetName(typeof(MatchGroup), pattern.Group).ToLower()),
+                                    Description = pattern.Description,
+                                    Value = _string,
+                                    Type = pattern.Type
+                                };
+
+                                if (!CanIgnore(result, pattern.Group))
+                                    results.Add(result);
+                            }
+
+                            continue;
+                        }
+
+                        var matches = pattern.Regex.Matches(_string);
+
+                        foreach (Match match in matches)
                         {
                             var result = new Result
                             {
                                 Group = (pattern.Group == MatchGroup.unknown ? pattern.CustomGroup : Enum.GetName(typeof(MatchGroup), pattern.Group).ToLower()),
                                 Description = pattern.Description,
-                                Value = _string,
+                                Value = match.Groups[0].Value,
                                 Type = pattern.Type
                             };
 
                             if (!CanIgnore(result, pattern.Group))
                                 results.Add(result);
                         }
-
-                        continue;
                     }
-
-                    var matches = pattern.Regex.Matches(_string);
-
-                    foreach (Match match in matches)
-                    {
-                        var result = new Result
-                        {
-                            Group = (pattern.Group == MatchGroup.unknown ? pattern.CustomGroup : Enum.GetName(typeof(MatchGroup), pattern.Group).ToLower()),
-                            Description = pattern.Description,
-                            Value = match.Groups[0].Value,
-                            Type = pattern.Type
-                        };
-
-                        if (!CanIgnore(result, pattern.Group))
-                            results.Add(result);
-                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show(ex.Message, "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                    Environment.Exit(1);
                 }
 
                 progress++;
