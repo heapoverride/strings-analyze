@@ -176,9 +176,7 @@ namespace Strings_Analyze
                     string _string = strings[index];
 
                     if (_string.Length > 1200)
-                    {
                         _string = _string.Substring(0, 1200);
-                    }
 
                     foreach (var pattern in patterns)
                     {
@@ -220,10 +218,8 @@ namespace Strings_Analyze
                         }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    System.Windows.MessageBox.Show(ex.Message, "Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
-                    Environment.Exit(1);
                 }
 
                 progress++;
@@ -250,7 +246,13 @@ namespace Strings_Analyze
             var results = new List<Result>();
             strings = File.ReadAllLines(path);
 
-            const int thread_count = 4;
+            if (strings.Length == 0)
+                Environment.Exit(0);
+
+            int thread_count = 4;
+            if (strings.Length > thread_count)
+                thread_count = 1;
+
             var threads = new Thread[thread_count];
             int value = (int)Math.Ceiling((double)strings.Length / (double)thread_count);
 
